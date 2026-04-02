@@ -73,7 +73,7 @@ function ResultContent() {
 
   return (
     <div className="flex-1 flex flex-col items-center px-6 safe-top safe-bottom">
-      <p className="text-[13px] text-[#555] tracking-[1px] uppercase mb-1">
+      <p className="text-[13px] text-[#888] tracking-[1px] uppercase mb-1">
         {dateFormatted}
       </p>
       <p className="text-[15px] text-[#888] mb-6">Today&apos;s score</p>
@@ -104,7 +104,7 @@ function ResultContent() {
           return (
             <div key={cat.id} className="flex items-center mb-3 gap-2.5">
               <span className="text-[16px] w-6 text-center">{cat.emoji}</span>
-              <span className="text-[13px] text-[#666] w-20">{cat.name}</span>
+              <span className="text-[13px] text-[#999] w-20">{cat.name}</span>
               <div className="flex-1 h-1.5 bg-[#111] rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-1000 ease-out"

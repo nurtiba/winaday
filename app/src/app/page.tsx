@@ -38,14 +38,14 @@ export default function Home() {
       <h1 className="text-[32px] font-extrabold tracking-[3px] mb-2">
         WIN<span className="text-[#4ade80]">THE</span>DAY
       </h1>
-      <p className="text-[14px] text-[#555] mb-10 text-center">
+      <p className="text-[14px] text-[#888] mb-10 text-center">
         Score your day. See the pattern. Share your progress.
       </p>
 
       {/* Today's status */}
       {scoredToday ? (
         <div className="text-center mb-10">
-          <p className="text-[14px] text-[#666] mb-2">Today&apos;s score</p>
+          <p className="text-[14px] text-[#999] mb-2">Today&apos;s score</p>
           <p className="text-[64px] font-extrabold leading-none" style={{ color: "#4ade80" }}>
             {Math.round(todayPercent)}%
           </p>
@@ -58,7 +58,7 @@ export default function Home() {
       ) : (
         <div className="text-center mb-16">
           <p className="text-[48px] mb-4">✨</p>
-          <p className="text-[16px] text-[#666]">
+          <p className="text-[16px] text-[#999]">
             {hasScores ? "Ready to score today?" : "Rate your day in 30 seconds"}
           </p>
         </div>
