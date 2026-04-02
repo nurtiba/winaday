@@ -30,6 +30,11 @@ body {
   padding-bottom: max(env(safe-area-inset-bottom), 16px);
 }
 
+/* Cursor pointer on interactive elements */
+button, a, [role="button"] {
+  cursor: pointer;
+}
+
 /* Hide scrollbar everywhere */
 ::-webkit-scrollbar {
   display: none;
