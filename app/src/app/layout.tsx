@@ -26,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable}`}>
+    <html lang="en" className={`${geistSans.variable}`} style={{ colorScheme: "dark" }}>
       <body>
         <div className="fixed inset-0 flex justify-center bg-[#050505]">
           <div className="w-full max-w-[430px] h-dvh bg-[#0a0a0a] flex flex-col overflow-hidden">
