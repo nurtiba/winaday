@@ -107,7 +107,7 @@ export default function ScoreCard({
               type="button"
               key={val}
               onClick={() => onScoreChange(val)}
-              className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-medium transition-all duration-150 active:scale-110"
+              className="relative w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-medium transition-all duration-150 active:scale-110 before:absolute before:inset-[-7px] before:content-['']"
               style={{
                 backgroundColor: isSelected ? category.colorBg : "#151520",
                 borderWidth: 1,
