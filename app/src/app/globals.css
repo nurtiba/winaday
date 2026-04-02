@@ -35,6 +35,12 @@ button, a, [role="button"] {
   cursor: pointer;
 }
 
+/* Focus-visible ring for keyboard navigation */
+:focus-visible {
+  outline: 2px solid #4ade80;
+  outline-offset: 2px;
+}
+
 /* Hide scrollbar everywhere */
 ::-webkit-scrollbar {
   display: none;
