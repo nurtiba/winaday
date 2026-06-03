@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getAllScores, getStreak, DayScore } from "@/lib/storage";
+import { formatDate, getAllScores, getStreak, DayScore } from "@/lib/storage";
 import { getHeatmapColor } from "@/lib/categories";
 
 export default function CalendarPage() {
@@ -11,8 +11,15 @@ export default function CalendarPage() {
   const [streak, setStreak] = useState(0);
 
   useEffect(() => {
-    setScores(getAllScores());
-    setStreak(getStreak());
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      setScores(getAllScores());
+      setStreak(getStreak());
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Build 365-day grid
@@ -22,7 +29,7 @@ export default function CalendarPage() {
   for (let i = 364; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split("T")[0];
+    const dateStr = formatDate(d);
     const found = scores.find((s) => s.date === dateStr);
     cells.push({
       date: dateStr,

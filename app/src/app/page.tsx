@@ -1,31 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAllScores, getStreak, getToday, getScoreForDate } from "@/lib/storage";
+import { getActiveStats, UserBuild } from "@/lib/categories";
+import {
+  DayScore,
+  getAllScores,
+  getDisplayStatResults,
+  getScoreForDate,
+  getStreak,
+  getToday,
+  getUserBuild,
+} from "@/lib/storage";
 
 export default function Home() {
   const router = useRouter();
+  const [build, setBuild] = useState<UserBuild | null>(null);
   const [hasScores, setHasScores] = useState(false);
-  const [scoredToday, setScoredToday] = useState(false);
+  const [todayScore, setTodayScore] = useState<DayScore | null>(null);
   const [streak, setStreak] = useState(0);
-  const [todayPercent, setTodayPercent] = useState(0);
 
   useEffect(() => {
-    const scores = getAllScores();
-    setHasScores(scores.length > 0);
-    setStreak(getStreak());
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      const nextBuild = getUserBuild();
+      const scores = getAllScores();
+      const today = getToday();
 
-    const today = getToday();
-    const todayScore = getScoreForDate(today);
-    if (todayScore) {
-      setScoredToday(true);
-      setTodayPercent(todayScore.totalPercent);
-    }
+      setBuild(nextBuild);
+      setHasScores(scores.length > 0);
+      setStreak(getStreak());
+      setTodayScore(getScoreForDate(today));
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
+  const activeStats = useMemo(() => (build ? getActiveStats(build) : []), [build]);
+  const displayResults = todayScore && build ? getDisplayStatResults(todayScore, build) : [];
+
   const handleMainAction = () => {
-    if (scoredToday) {
+    if (todayScore) {
       router.push(`/result?date=${getToday()}`);
     } else {
       router.push("/score");
@@ -33,57 +50,99 @@ export default function Home() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-8">
-      {/* Logo */}
-      <h1 className="text-[32px] font-extrabold tracking-[3px] mb-2">
-        WIN<span className="text-[#4ade80]">THE</span>DAY
-      </h1>
-      <p className="text-[14px] text-[#888] mb-10 text-center">
-        Score your day. See the pattern. Share your progress.
-      </p>
-
-      {/* Today's status */}
-      {scoredToday ? (
-        <div className="text-center mb-10">
-          <p className="text-[14px] text-[#999] mb-2">Today&apos;s score</p>
-          <p className="text-[64px] font-extrabold leading-none" style={{ color: "#4ade80" }}>
-            {Math.round(todayPercent)}%
+    <div className="flex-1 overflow-y-auto px-6 safe-top safe-bottom text-white">
+      <div className="flex min-h-full flex-col">
+        <div className="pt-4 text-center">
+          <h1 className="text-[30px] font-extrabold tracking-[2px]">
+            WIN<span className="text-[#4ade80]">THE</span>DAY
+          </h1>
+          <p className="mt-2 text-[14px] text-[#777]">
+            Win life by winning today.
           </p>
-          {streak > 0 && (
-            <p className="text-[14px] text-[#4ade80] mt-2">
-              🔥 {streak} day streak
-            </p>
+        </div>
+
+        <section className="my-9 text-center">
+          {todayScore ? (
+            <>
+              <p className="text-[13px] uppercase tracking-[1px] text-[#666]">Today&apos;s Life Score</p>
+              <p className="mt-2 text-[74px] font-extrabold leading-none" style={{ color: "#4ade80" }}>
+                {Math.round(todayScore.totalPercent)}%
+              </p>
+              {streak > 0 && (
+                <p className="mt-3 text-[14px] font-semibold text-[#4ade80]">
+                  {streak} day streak
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-[13px] uppercase tracking-[1px] text-[#666]">Today is unscored</p>
+              <p className="mx-auto mt-4 max-w-[260px] text-[28px] font-extrabold leading-tight">
+                Check your non-negotiables.
+              </p>
+              <p className="mx-auto mt-3 max-w-[280px] text-[14px] leading-relaxed text-[#777]">
+                Five quick stats. No guessing a grade out of thin air.
+              </p>
+            </>
           )}
-        </div>
-      ) : (
-        <div className="text-center mb-16">
-          <p className="text-[48px] mb-4">✨</p>
-          <p className="text-[16px] text-[#999]">
-            {hasScores ? "Ready to score today?" : "Rate your day in 30 seconds"}
-          </p>
-        </div>
-      )}
+        </section>
 
-      {/* Main CTA */}
-      <button
-        type="button"
-        onClick={handleMainAction}
-        className="w-1/2 min-h-[48px] py-3.5 rounded-lg text-[16px] font-bold text-white mb-4 active:scale-[0.97] transition-transform"
-        style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", WebkitTapHighlightColor: "transparent" }}
-      >
-        {scoredToday ? "View Today" : "Score My Day →"}
-      </button>
+        <div className="space-y-2.5">
+          {todayScore
+            ? displayResults.map((result) => (
+                <div key={result.statId} className="flex items-center gap-2.5 rounded-xl border border-[#1f1f2f] bg-[#101018] px-3 py-2.5">
+                  <span className="w-7 text-center text-[17px]">{result.statEmoji}</span>
+                  <span className="w-24 text-[13px] font-semibold text-[#aaa]">{result.statName}</span>
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#202030]">
+                    <div className="h-full rounded-full" style={{ width: `${result.score}%`, background: result.statColor }} />
+                  </div>
+                  <span className="w-8 text-right text-[13px] font-bold" style={{ color: result.statColor }}>
+                    {result.score}
+                  </span>
+                </div>
+              ))
+            : activeStats.map((stat) => (
+                <div key={stat.id} className="flex items-center gap-3 rounded-xl border border-[#1f1f2f] bg-[#101018] px-3 py-2.5">
+                  <span className="w-7 text-center text-[17px]">{stat.emoji}</span>
+                  <span className="flex-1 text-[14px] font-semibold text-[#ddd]">{stat.name}</span>
+                  <span className="text-[12px] text-[#555]">
+                    {stat.nonNegotiables.filter((item) => item.active).length} items
+                  </span>
+                </div>
+              ))}
+        </div>
 
-      {/* Secondary actions */}
-      {hasScores && (
-        <button
-          type="button"
-          onClick={() => router.push("/calendar")}
-          className="w-1/2 min-h-[44px] py-2.5 rounded-lg text-[14px] text-[#777] bg-[#111] border border-[#222] text-center"
-        >
-          📅 View Calendar
-        </button>
-      )}
+        <div className="min-h-8 flex-1" />
+
+        <div className="pb-2">
+          <button
+            type="button"
+            onClick={handleMainAction}
+            className="min-h-[52px] w-full rounded-xl text-[17px] font-extrabold text-white active:scale-[0.98]"
+            style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}
+          >
+            {todayScore ? "View Today" : "Score Today"}
+          </button>
+
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => router.push("/build")}
+              className="min-h-[46px] rounded-xl border border-[#222] bg-[#111] text-[14px] font-semibold text-[#777]"
+            >
+              Edit Build
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/calendar")}
+              className="min-h-[46px] rounded-xl border border-[#222] bg-[#111] text-[14px] font-semibold text-[#777]"
+              disabled={!hasScores}
+            >
+              Calendar
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

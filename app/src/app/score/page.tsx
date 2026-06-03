@@ -1,66 +1,133 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CATEGORIES } from "@/lib/categories";
-import { getToday, getScoreForDate, saveScore, getDaysSinceLastScore } from "@/lib/storage";
+import { getActiveStats, UserBuild } from "@/lib/categories";
+import {
+  buildDayStatResult,
+  DayStatResult,
+  getDaysSinceLastScore,
+  getScoreForDate,
+  getToday,
+  getUserBuild,
+  saveScore,
+} from "@/lib/storage";
 import ScoreCard from "@/components/ScoreCard";
+
+interface StatDraft {
+  completedIds: string[];
+  extraEffort: 0 | 10 | 20;
+  note: string;
+}
+
+function createDrafts(build: UserBuild): Record<string, StatDraft> {
+  const drafts: Record<string, StatDraft> = {};
+  getActiveStats(build).forEach((stat) => {
+    drafts[stat.id] = {
+      completedIds: [],
+      extraEffort: 0,
+      note: "",
+    };
+  });
+  return drafts;
+}
 
 export default function ScorePage() {
   const router = useRouter();
+  const [build, setBuild] = useState<UserBuild | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, StatDraft>>({});
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [scores, setScores] = useState<Record<string, number>>(() => {
-    const defaults: Record<string, number> = {};
-    CATEGORIES.forEach((c) => (defaults[c.id] = 5));
-    return defaults;
-  });
-  const [comments, setComments] = useState<Record<string, string>>(() => {
-    const defaults: Record<string, string> = {};
-    CATEGORIES.forEach((c) => (defaults[c.id] = ""));
-    return defaults;
-  });
   const [showWelcomeBack, setShowWelcomeBack] = useState(false);
 
   useEffect(() => {
-    const today = getToday();
-    const existing = getScoreForDate(today);
-    if (existing) {
-      router.push(`/result?date=${today}`);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      const today = getToday();
+      const existing = getScoreForDate(today);
+      if (existing) {
+        router.push(`/result?date=${today}`);
+        return;
+      }
+
+      const nextBuild = getUserBuild();
+      setBuild(nextBuild);
+      setDrafts(createDrafts(nextBuild));
+
+      const daysSince = getDaysSinceLastScore();
+      if (daysSince > 1) {
+        setShowWelcomeBack(true);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
+  const activeStats = useMemo(() => (build ? getActiveStats(build) : []), [build]);
+  const stat = activeStats[currentIndex];
+  const draft = stat ? drafts[stat.id] : null;
+
+  const updateDraft = (statId: string, updater: (draft: StatDraft) => StatDraft) => {
+    setDrafts((current) => ({
+      ...current,
+      [statId]: updater(current[statId] || { completedIds: [], extraEffort: 0, note: "" }),
+    }));
+  };
+
+  const handleToggleItem = (itemId: string) => {
+    if (!stat) return;
+    updateDraft(stat.id, (current) => {
+      const alreadyDone = current.completedIds.includes(itemId);
+      return {
+        ...current,
+        completedIds: alreadyDone
+          ? current.completedIds.filter((id) => id !== itemId)
+          : [...current.completedIds, itemId],
+      };
+    });
+  };
+
+  const handleNext = () => {
+    if (!build) return;
+
+    if (currentIndex < activeStats.length - 1) {
+      setCurrentIndex((index) => index + 1);
       return;
     }
 
-    const daysSince = getDaysSinceLastScore();
-    if (daysSince > 1) {
-      setShowWelcomeBack(true);
-    }
-  }, [router]);
+    const statResults = activeStats.reduce<Record<string, DayStatResult>>((acc, currentStat) => {
+      const currentDraft = drafts[currentStat.id] || { completedIds: [], extraEffort: 0, note: "" };
+      acc[currentStat.id] = buildDayStatResult(
+        currentStat,
+        currentDraft.completedIds,
+        currentDraft.extraEffort,
+        currentDraft.note
+      );
+      return acc;
+    }, {});
 
-  const category = CATEGORIES[currentIndex];
+    const scores = Object.fromEntries(
+      Object.entries(statResults).map(([statId, result]) => [statId, result.score])
+    );
+    const comments = Object.fromEntries(
+      Object.entries(statResults).map(([statId, result]) => [statId, result.note])
+    );
+    const totalPercent = Math.round(
+      Object.values(statResults).reduce((sum, result) => sum + result.score, 0) / activeStats.length
+    );
+    const today = getToday();
 
-  const handleNext = () => {
-    if (currentIndex < CATEGORIES.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      const total = CATEGORIES.reduce((sum, cat) => sum + (scores[cat.id] || 0), 0);
-      const totalPercent = Math.round((total / 50) * 100);
-      const today = getToday();
+    saveScore({
+      date: today,
+      scores,
+      comments,
+      statResults,
+      totalPercent,
+      createdAt: new Date().toISOString(),
+    });
 
-      saveScore({
-        date: today,
-        scores,
-        comments,
-        totalPercent,
-        createdAt: new Date().toISOString(),
-      });
-
-      router.push(`/result?date=${today}`);
-    }
-  };
-
-  const handleBack = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-    }
+    router.push(`/result?date=${today}`);
   };
 
   if (showWelcomeBack) {
@@ -73,42 +140,40 @@ export default function ScorePage() {
       <div className="flex-1 flex flex-col items-center px-7 safe-top safe-bottom justify-center">
         <div className="text-6xl mb-6">👋</div>
         <h1 className="text-[26px] font-bold text-center mb-2.5 leading-tight">
-          Hey, welcome back!
+          Welcome back
         </h1>
         <p className="text-[15px] text-[#666] text-center leading-relaxed mb-1.5">
-          You took a break. That&apos;s okay.
+          You missed a few days.
           <br />
-          Everyone does. What matters is
-          <br />
-          you&apos;re here now.
+          No drama. Score today.
         </p>
 
         <div className="flex gap-1.5 my-8">
-          {weekDays.map((day, i) => {
-            const jsDay = (i + 1) % 7;
-            const daysAgo = ((dayOfWeek - jsDay + 7) % 7);
+          {weekDays.map((day, index) => {
+            const jsDay = (index + 1) % 7;
+            const daysAgo = (dayOfWeek - jsDay + 7) % 7;
             const isToday = daysAgo === 0;
             const isMissed = daysAgo > 0 && daysAgo <= daysMissed;
             const isScored = daysAgo > daysMissed;
 
             return (
               <div
-                key={i}
+                key={day + index}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-semibold"
                 style={{
                   backgroundColor: isToday
                     ? "rgba(99, 102, 241, 0.15)"
                     : isScored
-                    ? "rgba(74, 222, 128, 0.15)"
-                    : "rgba(255,255,255,0.03)",
+                      ? "rgba(74, 222, 128, 0.15)"
+                      : "rgba(255,255,255,0.03)",
                   color: isToday ? "#818cf8" : isScored ? "#4ade80" : "#333",
                   border: isToday
                     ? "1px solid rgba(99, 102, 241, 0.3)"
                     : isMissed
-                    ? "1px dashed #222"
-                    : isScored
-                    ? "1px solid rgba(74, 222, 128, 0.2)"
-                    : "1px solid transparent",
+                      ? "1px dashed #222"
+                      : isScored
+                        ? "1px solid rgba(74, 222, 128, 0.2)"
+                        : "1px solid transparent",
                 }}
               >
                 {day}
@@ -118,7 +183,7 @@ export default function ScorePage() {
         </div>
 
         <p className="text-[13px] text-[#444] mb-12">
-          {daysMissed} day{daysMissed !== 1 ? "s" : ""} missed · no big deal
+          {daysMissed} day{daysMissed !== 1 ? "s" : ""} missed
         </p>
 
         <button
@@ -127,7 +192,7 @@ export default function ScorePage() {
           className="w-full min-h-[48px] py-4 rounded-2xl text-[17px] font-bold text-white"
           style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}
         >
-          Score Today →
+          Score Today
         </button>
         <button
           type="button"
@@ -140,20 +205,26 @@ export default function ScorePage() {
     );
   }
 
+  if (!build || !stat || !draft) {
+    return <div className="flex-1 bg-[#0a0a0a]" />;
+  }
+
   return (
     <div className="flex-1 flex flex-col bg-[#0a0a0a] text-white">
       <ScoreCard
-        category={category}
-        score={scores[category.id]}
-        comment={comments[category.id]}
+        stat={stat}
+        completedIds={draft.completedIds}
+        extraEffort={draft.extraEffort}
+        note={draft.note}
         currentIndex={currentIndex}
-        total={CATEGORIES.length}
-        onScoreChange={(val) => setScores({ ...scores, [category.id]: val })}
-        onCommentChange={(val) => setComments({ ...comments, [category.id]: val })}
+        total={activeStats.length}
+        onToggleItem={handleToggleItem}
+        onExtraEffortChange={(extraEffort) => updateDraft(stat.id, (current) => ({ ...current, extraEffort }))}
+        onNoteChange={(note) => updateDraft(stat.id, (current) => ({ ...current, note }))}
         onNext={handleNext}
-        onBack={handleBack}
+        onBack={() => setCurrentIndex((index) => Math.max(0, index - 1))}
         isFirst={currentIndex === 0}
-        isLast={currentIndex === CATEGORIES.length - 1}
+        isLast={currentIndex === activeStats.length - 1}
       />
     </div>
   );

@@ -3,7 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { getScoreForDate, DayScore } from "@/lib/storage";
+import {
+  getScoreForDate,
+  DayScore,
+  getShareBreakdownPreference,
+  saveShareBreakdownPreference,
+} from "@/lib/storage";
 import ShareCard from "@/components/ShareCard";
 import html2canvas from "html2canvas";
 
@@ -13,20 +18,35 @@ function ShareContent() {
   const date = searchParams.get("date");
   const [dayScore, setDayScore] = useState<DayScore | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!date) {
-      router.push("/score");
-      return;
-    }
-    const score = getScoreForDate(date);
-    if (!score) {
-      router.push("/score");
-      return;
-    }
-    setDayScore(score);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      if (!date) {
+        router.push("/score");
+        return;
+      }
+      const score = getScoreForDate(date);
+      if (!score) {
+        router.push("/score");
+        return;
+      }
+      setDayScore(score);
+      setShowBreakdown(getShareBreakdownPreference());
+    });
+    return () => {
+      active = false;
+    };
   }, [date, router]);
+
+  const toggleBreakdown = () => {
+    const next = !showBreakdown;
+    setShowBreakdown(next);
+    saveShareBreakdownPreference(next);
+  };
 
   const generateImage = async (): Promise<Blob | null> => {
     if (!cardRef.current) return null;
@@ -36,6 +56,7 @@ function ShareContent() {
         scale: 3,
         useCORS: true,
       });
+      if (canvas.width === 0 || canvas.height === 0) return null;
       return new Promise((resolve) => {
         canvas.toBlob((blob) => resolve(blob), "image/png", 1.0);
       });
@@ -60,15 +81,13 @@ function ShareContent() {
         await navigator.share({
           files: [file],
           title: "WinTheDay",
-          text: `I scored ${Math.round(dayScore!.totalPercent)}% today! 🔥`,
+          text: `I scored ${Math.round(dayScore!.totalPercent)}% today on WinTheDay.`,
         });
       } else {
-        // Fallback: download
         downloadImage(blob);
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== "AbortError") {
-        // User cancelled share, that's fine
         const blob = await generateImage();
         if (blob) downloadImage(blob);
       }
@@ -102,11 +121,33 @@ function ShareContent() {
 
       {/* Share card preview */}
       <div className="shadow-2xl">
-        <ShareCard dayScore={dayScore} cardRef={cardRef} />
+        <ShareCard dayScore={dayScore} showBreakdown={showBreakdown} cardRef={cardRef} />
       </div>
 
+      <button
+        type="button"
+        onClick={toggleBreakdown}
+        className="mt-4 flex min-h-[44px] w-full max-w-[300px] items-center justify-between rounded-xl border border-[#222] bg-[#111] px-3.5 text-left"
+      >
+        <span>
+          <span className="block text-[13px] font-semibold text-[#aaa]">Show stat breakdown</span>
+          <span className="block text-[11px] text-[#444]">
+            {showBreakdown ? "Visible on this card" : "Hidden for privacy"}
+          </span>
+        </span>
+        <span
+          className="flex h-6 w-11 items-center rounded-full p-0.5 transition-colors"
+          style={{ backgroundColor: showBreakdown ? "#4ade80" : "#2a2a35" }}
+        >
+          <span
+            className="h-5 w-5 rounded-full bg-white transition-transform"
+            style={{ transform: showBreakdown ? "translateX(20px)" : "translateX(0)" }}
+          />
+        </span>
+      </button>
+
       {/* Action buttons */}
-      <div className="flex gap-2 w-full mt-4 max-w-[300px]">
+      <div className="flex gap-2 w-full mt-3 max-w-[300px]">
         <button
           onClick={handleShare}
           disabled={sharing}

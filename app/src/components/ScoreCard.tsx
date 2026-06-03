@@ -1,15 +1,17 @@
 "use client";
 
-import { Category, getAnchorLabel } from "@/lib/categories";
+import { calculateStatScore, getActiveNonNegotiables, LifeStat } from "@/lib/categories";
 
 interface ScoreCardProps {
-  category: Category;
-  score: number;
-  comment: string;
+  stat: LifeStat;
+  completedIds: string[];
+  extraEffort: 0 | 10 | 20;
+  note: string;
   currentIndex: number;
   total: number;
-  onScoreChange: (score: number) => void;
-  onCommentChange: (comment: string) => void;
+  onToggleItem: (itemId: string) => void;
+  onExtraEffortChange: (extraEffort: 0 | 10 | 20) => void;
+  onNoteChange: (note: string) => void;
   onNext: () => void;
   onBack: () => void;
   isFirst: boolean;
@@ -17,133 +19,143 @@ interface ScoreCardProps {
 }
 
 export default function ScoreCard({
-  category,
-  score,
-  comment,
+  stat,
+  completedIds,
+  extraEffort,
+  note,
   currentIndex,
   total,
-  onScoreChange,
-  onCommentChange,
+  onToggleItem,
+  onExtraEffortChange,
+  onNoteChange,
   onNext,
   onBack,
   isFirst,
   isLast,
 }: ScoreCardProps) {
-  const anchorLabel = getAnchorLabel(category.anchors, score);
+  const items = getActiveNonNegotiables(stat);
+  const statScore = calculateStatScore(items.length, completedIds.length, extraEffort);
+  const completedText = `${completedIds.length}/${items.length} non-negotiables`;
 
   return (
-    <div className="flex flex-col flex-1 px-6 safe-top safe-bottom">
-      {/* Progress dots */}
-      <div className="flex justify-center gap-2.5 py-4 shrink-0">
-        {Array.from({ length: total }).map((_, i) => (
-          <div
-            key={i}
-            className="w-2.5 h-2.5 rounded-full transition-all duration-300"
-            style={{
-              backgroundColor:
-                i < currentIndex
-                  ? category.color
-                  : i === currentIndex
-                  ? "#fff"
-                  : "#1a1a2e",
-              boxShadow: i === currentIndex ? "0 0 8px rgba(255,255,255,0.3)" : "none",
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Top spacer */}
-      <div className="flex-1 min-h-2" />
-
-      {/* Emoji */}
-      <div className="text-center text-5xl mb-3 shrink-0">{category.emoji}</div>
-
-      {/* Question */}
-      <h1 className="text-center text-[24px] font-bold mb-6 leading-tight px-2 shrink-0">
-        How was your{" "}
-        <span style={{ color: category.color }}>{category.name.toLowerCase()}</span>{" "}
-        today?
-      </h1>
-
-      {/* Score circle */}
-      <div className="flex items-center justify-center gap-5 mb-2 shrink-0">
-        <button
-          type="button"
-          onClick={() => onScoreChange(Math.max(1, score - 1))}
-          className="w-12 h-12 rounded-full flex items-center justify-center text-2xl border border-[#222] bg-[#111] text-[#555] active:scale-90 transition-transform"
-        >
-          −
-        </button>
-        <div
-          className="w-[88px] h-[88px] rounded-full flex items-center justify-center text-[40px] font-extrabold transition-all duration-200"
-          style={{
-            backgroundColor: category.colorBg,
-            color: category.color,
-            borderWidth: 2,
-            borderColor: category.colorBorder,
-          }}
-        >
-          {score}
+    <div className="flex flex-1 flex-col overflow-y-auto px-5 safe-top safe-bottom">
+      <div className="flex items-center justify-between py-2 shrink-0">
+        <span className="text-[12px] text-[#666]">{currentIndex + 1}/{total}</span>
+        <div className="flex justify-center gap-2">
+          {Array.from({ length: total }).map((_, index) => (
+            <div
+              key={index}
+              className="h-2.5 w-2.5 rounded-full transition-all duration-300"
+              style={{
+                backgroundColor: index <= currentIndex ? stat.color : "#1a1a2e",
+                opacity: index === currentIndex ? 1 : 0.65,
+              }}
+            />
+          ))}
         </div>
-        <button
-          type="button"
-          onClick={() => onScoreChange(Math.min(10, score + 1))}
-          className="w-12 h-12 rounded-full flex items-center justify-center text-2xl border border-[#222] bg-[#111] text-[#555] active:scale-90 transition-transform"
-        >
-          +
-        </button>
+        <span className="text-[12px] text-[#666]">Today</span>
       </div>
 
-      {/* Anchor label */}
-      <p className="text-center text-[13px] text-[#666] mb-4 shrink-0">{anchorLabel}</p>
+      <div className="shrink-0 text-center pt-5 pb-4">
+        <div className="text-[42px] leading-none mb-2">{stat.emoji}</div>
+        <p className="text-[12px] font-bold uppercase tracking-[1px] text-[#666]">{stat.name}</p>
+        <h1 className="mt-2 text-[25px] font-extrabold leading-tight">
+          What did you complete?
+        </h1>
+      </div>
 
-      {/* 1-10 dot scale */}
-      <div className="flex justify-between mb-1 shrink-0">
-        {Array.from({ length: 10 }).map((_, i) => {
-          const val = i + 1;
-          const isSelected = val === score;
+      <div className="mb-4 rounded-2xl border px-4 py-3" style={{ borderColor: stat.colorBorder, background: stat.colorBg }}>
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[12px] text-[#999]">{completedText}</p>
+            <p className="text-[13px] text-[#777]">Bare minimum caps at 80</p>
+          </div>
+          <p className="text-[44px] font-extrabold leading-none" style={{ color: stat.color }}>
+            {statScore}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2.5 shrink-0">
+        {items.map((item) => {
+          const checked = completedIds.includes(item.id);
           return (
             <button
+              key={item.id}
               type="button"
-              key={val}
-              onClick={() => onScoreChange(val)}
-              className="relative w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-medium transition-all duration-150 active:scale-110 before:absolute before:inset-[-7px] before:content-['']"
+              onClick={() => onToggleItem(item.id)}
+              className="flex min-h-[54px] w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-transform active:scale-[0.99]"
               style={{
-                backgroundColor: isSelected ? category.colorBg : "#151520",
-                borderWidth: 1,
-                borderColor: isSelected ? category.color : "#1a1a2e",
-                color: isSelected ? category.color : "#444",
+                backgroundColor: checked ? stat.colorBg : "#101018",
+                borderColor: checked ? stat.colorBorder : "#222233",
               }}
             >
-              {val}
+              <span
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[15px] font-bold"
+                style={{
+                  borderColor: checked ? stat.color : "#333344",
+                  backgroundColor: checked ? stat.color : "transparent",
+                  color: checked ? "#050505" : "#555566",
+                }}
+              >
+                {checked ? "✓" : ""}
+              </span>
+              <span className="text-[14px] font-semibold leading-snug text-[#e8e8e8]">{item.label}</span>
             </button>
           );
         })}
       </div>
-      <div className="flex justify-between mb-4 shrink-0">
-        <span className="text-[10px] text-[#444]">{category.scaleMin}</span>
-        <span className="text-[10px] text-[#444]">{category.scaleMax}</span>
+
+      <div className="mt-4 shrink-0">
+        <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.8px] text-[#666]">
+          Extra effort
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {[0, 10, 20].map((value) => {
+            const selected = extraEffort === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onExtraEffortChange(value as 0 | 10 | 20)}
+                className="min-h-[44px] rounded-xl border text-[13px] font-bold"
+                style={{
+                  backgroundColor: selected ? stat.color : "#101018",
+                  borderColor: selected ? stat.color : "#222233",
+                  color: selected ? "#050505" : "#777788",
+                }}
+              >
+                {value === 0 ? "None" : `+${value}`}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Comment field */}
-      <textarea
-        value={comment}
-        onChange={(e) => onCommentChange(e.target.value)}
-        placeholder="What did you do? (optional)"
-        className="bg-[#0f0f1a] border border-[#1a1a2e] rounded-xl px-4 py-3 text-sm text-[#999] placeholder-[#444] resize-none focus:outline-none focus:border-[#2a2a3e] shrink-0"
-        rows={2}
-      />
+      <div className="mt-4 shrink-0">
+        <label className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.8px] text-[#666]" htmlFor={`note-${stat.id}`}>
+          Private note
+        </label>
+        <textarea
+          id={`note-${stat.id}`}
+          value={note}
+          onChange={(event) => onNoteChange(event.target.value)}
+          placeholder="What moved this stat today?"
+          className="min-h-[72px] w-full resize-none rounded-xl border border-[#222233] bg-[#0f0f1a] px-4 py-3 text-[14px] text-[#ddd] placeholder-[#555566] focus:border-[#3a3a4e] focus:outline-none"
+          rows={2}
+        />
+        <p className="mt-1.5 text-[11px] text-[#444]">Private. Never shown on share cards.</p>
+      </div>
 
-      {/* Bottom spacer */}
-      <div className="flex-1 min-h-4" />
+      <div className="min-h-4 flex-1" />
 
-      {/* Navigation buttons */}
       <div className="flex gap-3 shrink-0 pb-2">
         {!isFirst && (
           <button
             type="button"
             onClick={onBack}
-            className="px-5 min-h-[48px] rounded-xl text-[15px] font-semibold bg-[#111] border border-[#222] text-[#777] active:scale-95 transition-transform"
+            className="min-h-[50px] w-16 rounded-xl border border-[#222] bg-[#111] text-[18px] font-bold text-[#777] active:scale-95"
+            aria-label="Back"
           >
             ←
           </button>
@@ -151,12 +163,10 @@ export default function ScoreCard({
         <button
           type="button"
           onClick={onNext}
-          className="flex-1 min-h-[48px] rounded-xl text-[16px] font-bold text-white transition-all active:scale-[0.98]"
-          style={{
-            background: `linear-gradient(135deg, ${category.color}, ${category.color}dd)`,
-          }}
+          className="min-h-[50px] flex-1 rounded-xl text-[16px] font-extrabold text-white transition-transform active:scale-[0.98]"
+          style={{ background: `linear-gradient(135deg, ${stat.color}, ${stat.color}cc)` }}
         >
-          {isLast ? "See My Score →" : "Next →"}
+          {isLast ? "See Life Score" : "Next Stat"}
         </button>
       </div>
     </div>

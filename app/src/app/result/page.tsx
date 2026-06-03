@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { CATEGORIES, getVerdict } from "@/lib/categories";
-import { getScoreForDate, DayScore } from "@/lib/storage";
+import { getVerdict } from "@/lib/categories";
+import { DayScore, DayStatResult, getDisplayStatResults, getScoreForDate, getUserBuild } from "@/lib/storage";
 
 function AnimatedScore({ target }: { target: number }) {
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
-    const duration = 1500;
+    const duration = 900;
     const start = performance.now();
 
     const animate = (now: number) => {
@@ -27,17 +26,12 @@ function AnimatedScore({ target }: { target: number }) {
     requestAnimationFrame(animate);
   }, [target]);
 
-  return (
-    <span
-      style={{
-        background: "linear-gradient(135deg, #4ade80, #22c55e)",
-        WebkitBackgroundClip: "text",
-        WebkitTextFillColor: "transparent",
-      }}
-    >
-      {current}
-    </span>
-  );
+  return <span>{current}</span>;
+}
+
+function completedCount(result: DayStatResult): string {
+  const done = result.nonNegotiables.filter((item) => item.done).length;
+  return `${done}/${result.nonNegotiables.length}`;
 }
 
 function ResultContent() {
@@ -45,21 +39,31 @@ function ResultContent() {
   const searchParams = useSearchParams();
   const date = searchParams.get("date");
   const [dayScore, setDayScore] = useState<DayScore | null>(null);
-  const [showBars, setShowBars] = useState(false);
 
   useEffect(() => {
-    if (!date) {
-      router.push("/score");
-      return;
-    }
-    const score = getScoreForDate(date);
-    if (!score) {
-      router.push("/score");
-      return;
-    }
-    setDayScore(score);
-    setTimeout(() => setShowBars(true), 800);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      if (!date) {
+        router.push("/score");
+        return;
+      }
+      const score = getScoreForDate(date);
+      if (!score) {
+        router.push("/score");
+        return;
+      }
+      setDayScore(score);
+    });
+    return () => {
+      active = false;
+    };
   }, [date, router]);
+
+  const results = useMemo(() => {
+    if (!dayScore) return [];
+    return getDisplayStatResults(dayScore, getUserBuild());
+  }, [dayScore]);
 
   if (!dayScore) return null;
 
@@ -70,85 +74,91 @@ function ResultContent() {
     day: "numeric",
     year: "numeric",
   });
+  const sorted = [...results].sort((a, b) => b.score - a.score);
+  const best = sorted[0];
+  const needsAttention = sorted[sorted.length - 1];
 
   return (
-    <div className="flex-1 flex flex-col items-center px-6 safe-top safe-bottom">
-      <p className="text-[13px] text-[#888] tracking-[1px] uppercase mb-1">
-        {dateFormatted}
-      </p>
-      <p className="text-[15px] text-[#888] mb-6">Today&apos;s score</p>
+    <div className="flex-1 overflow-y-auto px-5 safe-top safe-bottom text-white">
+      <div className="text-center">
+        <p className="text-[12px] uppercase tracking-[1px] text-[#666]">{dateFormatted}</p>
+        <p className="mt-1 text-[15px] text-[#777]">Life Score</p>
 
-      {/* Big animated score */}
-      <div className="text-[80px] font-extrabold leading-none mb-1">
-        <AnimatedScore target={Math.round(dayScore.totalPercent)} />
-        <span
-          className="text-[44px] font-semibold"
-          style={{
-            background: "linear-gradient(135deg, #4ade80, #22c55e)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-          }}
-        >
-          %
-        </span>
+        <div className="mt-4 text-[86px] font-extrabold leading-none" style={{ color: "#4ade80" }}>
+          <AnimatedScore target={Math.round(dayScore.totalPercent)} />
+          <span className="text-[42px]">%</span>
+        </div>
+
+        <p className="mt-2 text-[20px] font-bold" style={{ color: "#4ade80" }}>
+          {verdict}
+        </p>
       </div>
 
-      <p className="text-[20px] font-semibold mb-6" style={{ color: "#4ade80" }}>
-        {verdict} 🔥
-      </p>
+      {best && needsAttention && (
+        <div className="mt-7 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-[#1f1f2f] bg-[#101018] p-3">
+            <p className="text-[11px] uppercase tracking-[0.8px] text-[#555]">Best stat</p>
+            <p className="mt-2 text-[15px] font-bold text-white">
+              {best.statEmoji} {best.statName}
+            </p>
+            <p className="mt-1 text-[13px] font-bold" style={{ color: best.statColor }}>{best.score}</p>
+          </div>
+          <div className="rounded-2xl border border-[#1f1f2f] bg-[#101018] p-3">
+            <p className="text-[11px] uppercase tracking-[0.8px] text-[#555]">Needs attention</p>
+            <p className="mt-2 text-[15px] font-bold text-white">
+              {needsAttention.statEmoji} {needsAttention.statName}
+            </p>
+            <p className="mt-1 text-[13px] font-bold" style={{ color: needsAttention.statColor }}>{needsAttention.score}</p>
+          </div>
+        </div>
+      )}
 
-      {/* Category breakdown */}
-      <div className="w-full mb-6">
-        {CATEGORIES.map((cat) => {
-          const score = dayScore.scores[cat.id] || 0;
-          return (
-            <div key={cat.id} className="flex items-center mb-3 gap-2.5">
-              <span className="text-[16px] w-6 text-center">{cat.emoji}</span>
-              <span className="text-[13px] text-[#999] w-20">{cat.name}</span>
-              <div className="flex-1 h-1.5 bg-[#111] rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-1000 ease-out"
-                  style={{
-                    width: showBars ? `${score * 10}%` : "0%",
-                    background: cat.color,
-                  }}
-                />
+      <div className="mt-5 space-y-3">
+        {results.map((result) => (
+          <div key={result.statId} className="rounded-2xl border border-[#1f1f2f] bg-[#101018] p-3.5">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[18px]">{result.statEmoji}</span>
+                <div>
+                  <p className="text-[14px] font-bold text-white">{result.statName}</p>
+                  <p className="text-[11px] text-[#555]">
+                    {completedCount(result)} done · +{result.extraEffort} extra
+                  </p>
+                </div>
               </div>
-              <span
-                className="text-[13px] font-bold w-5 text-right"
-                style={{ color: cat.color }}
-              >
-                {score}
-              </span>
+              <p className="text-[20px] font-extrabold" style={{ color: result.statColor }}>{result.score}</p>
             </div>
-          );
-        })}
+            <div className="h-1.5 overflow-hidden rounded-full bg-[#222233]">
+              <div className="h-full rounded-full" style={{ width: `${result.score}%`, background: result.statColor }} />
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="mt-auto w-full pb-2">
+      <div className="mt-6 pb-2">
         <button
           type="button"
           onClick={() => router.push(`/share?date=${dayScore.date}`)}
-          className="w-full min-h-[48px] py-4 rounded-2xl text-[17px] font-bold text-white mb-3"
+          className="min-h-[52px] w-full rounded-xl text-[17px] font-extrabold text-white"
           style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
         >
-          Share to Instagram ✨
+          Create Share Card
         </button>
 
-        <div className="flex gap-2.5">
+        <div className="mt-3 grid grid-cols-2 gap-3">
           <button
             type="button"
             onClick={() => router.push("/calendar")}
-            className="flex-1 min-h-[44px] py-3 rounded-xl text-[13px] text-[#777] bg-[#111] border border-[#222] text-center"
+            className="min-h-[46px] rounded-xl border border-[#222] bg-[#111] text-[14px] font-semibold text-[#777]"
           >
-            📅 Calendar
+            Calendar
           </button>
           <button
             type="button"
             onClick={() => router.push("/")}
-            className="flex-1 min-h-[44px] py-3 rounded-xl text-[13px] text-[#777] bg-[#111] border border-[#222] text-center"
+            className="min-h-[46px] rounded-xl border border-[#222] bg-[#111] text-[14px] font-semibold text-[#777]"
           >
-            💾 Done
+            Done
           </button>
         </div>
       </div>
