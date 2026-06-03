@@ -59,7 +59,7 @@ export default function CalendarPage() {
   });
 
   return (
-    <div className="flex-1 flex flex-col text-white px-5 safe-top safe-bottom overflow-y-auto overflow-x-hidden">
+    <div className="mobile-scroll flex min-h-0 flex-1 flex-col overflow-x-hidden px-5 safe-top safe-bottom text-white">
       {/* Header */}
       <h1 className="text-[22px] font-bold text-center mb-2">Your Year</h1>
 

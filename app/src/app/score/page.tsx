@@ -137,7 +137,7 @@ export default function ScorePage() {
     const dayOfWeek = today.getDay();
 
     return (
-      <div className="flex-1 flex flex-col items-center px-7 safe-top safe-bottom justify-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-7 safe-top safe-bottom">
         <div className="text-6xl mb-6">👋</div>
         <h1 className="text-[26px] font-bold text-center mb-2.5 leading-tight">
           Welcome back
@@ -210,7 +210,7 @@ export default function ScorePage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0a0a0a] text-white">
+    <div className="flex min-h-0 flex-1 flex-col bg-[#0a0a0a] text-white">
       <ScoreCard
         stat={stat}
         completedIds={draft.completedIds}

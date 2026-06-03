@@ -29,7 +29,7 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable}`} style={{ colorScheme: "dark" }}>
       <body>
         <div className="fixed inset-0 flex justify-center bg-[#050505]">
-          <div className="w-full max-w-[430px] h-dvh bg-[#0a0a0a] flex flex-col overflow-hidden">
+          <div className="flex h-dvh min-h-0 w-full max-w-[430px] flex-col overflow-hidden bg-[#0a0a0a]">
             {children}
           </div>
         </div>

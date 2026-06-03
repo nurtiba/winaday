@@ -79,7 +79,7 @@ function ResultContent() {
   const needsAttention = sorted[sorted.length - 1];
 
   return (
-    <div className="flex-1 overflow-y-auto px-5 safe-top safe-bottom text-white">
+    <div className="mobile-scroll min-h-0 flex-1 px-5 safe-top safe-bottom text-white">
       <div className="text-center">
         <p className="text-[12px] uppercase tracking-[1px] text-[#666]">{dateFormatted}</p>
         <p className="mt-1 text-[15px] text-[#777]">Life Score</p>

@@ -114,7 +114,7 @@ function ShareContent() {
   if (!dayScore) return null;
 
   return (
-    <div className="h-dvh bg-[#0a0a0a] text-white flex flex-col items-center px-5 pt-[max(env(safe-area-inset-top),2rem)] pb-[max(env(safe-area-inset-bottom),1.5rem)] overflow-auto">
+    <div className="mobile-scroll flex h-dvh flex-col items-center bg-[#0a0a0a] px-5 pt-[max(env(safe-area-inset-top),2rem)] pb-[max(env(safe-area-inset-bottom),1.5rem)] text-white">
       <p className="text-[12px] text-[#444] tracking-[1px] uppercase mb-4">
         Your card
       </p>
